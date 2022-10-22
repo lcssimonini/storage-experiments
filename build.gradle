@@ -2,11 +2,25 @@ plugins {
 	id 'org.springframework.boot' version '2.7.4'
 	id 'io.spring.dependency-management' version '1.0.14.RELEASE'
 	id 'java'
+	id 'jacoco'
+	id 'com.diffplug.spotless' version '6.9.0'
+	id 'com.avast.gradle.docker-compose' version '0.16.8'
+	id 'org.sonarqube' version '3.2.0'
+	id 'org.liquibase.gradle' version '2.1.1'
 }
 
 group = 'com.simonini'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '17'
+
+compileJava {
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+jar {
+	enabled = false
+}
+
 
 configurations {
 	compileOnly {
@@ -23,7 +37,21 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.liquibase:liquibase-core'
+	implementation 'net.kaczmarzyk:specification-arg-resolver:2.7.0'
+
+	liquibaseRuntime group: 'org.liquibase.ext', name: 'liquibase-hibernate5', version: '4.17.0'
+	liquibaseRuntime 'info.picocli:picocli:4.6.3'
+	liquibaseRuntime 'org.liquibase:liquibase-core'
+	liquibaseRuntime group: 'org.postgresql', name: 'postgresql', version: '42.5.0'
+	liquibaseRuntime 'org.yaml:snakeyaml:1.33'
+	liquibaseRuntime 'org.springframework.boot:spring-boot'
+	liquibaseRuntime 'org.springframework:spring-orm'
+	liquibaseRuntime 'javax.xml.bind:jaxb-api'
+	liquibaseRuntime 'org.hibernate:hibernate-core'
+	liquibaseRuntime sourceSets.main.output
+
+	implementation 'org.springdoc:springdoc-openapi-ui:1.6.11'
+
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -33,3 +61,64 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+//dockerCompose.isRequiredBy(test)
+//dockerCompose.isRequiredBy(bootRun)
+
+spotless {
+	java {
+		importOrder()
+		removeUnusedImports()
+		googleJavaFormat()
+		indentWithSpaces()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
+}
+
+compileJava.dependsOn spotlessApply
+
+test {
+	finalizedBy jacocoTestReport
+	useJUnitPlatform()
+}
+
+jacocoTestReport {
+	reports {
+		xml.enabled true
+		html.enabled true
+	}
+	dependsOn test
+}
+
+diff.dependsOn compileJava
+diffChangeLog.dependsOn compileJava
+
+liquibase {
+	activities {
+//		System.getenv('ENV_NAME')
+		main {
+			changeLogFile "src/main/resources/db/changelog/db.changelog-master.xml"
+			url "jdbc:postgresql://localhost:5432/storage-experiments"
+			username "postgres"
+			password "postgres"
+			driver "org.postgresql.Driver"
+		}
+		diffMain {
+			changeLogFile "src/main/resources/db/changelog/sql/" + System.getenv('CHANGELOG_FILE_NAME')
+//			changeLogFile "src/main/resources/db/changelog/db.changelog-master.xml"
+			url "jdbc:postgresql://localhost:5432/storage-experiments"
+			username "postgres"
+			password "postgres"
+			driver "org.postgresql.Driver"
+			referenceUrl "hibernate:spring:com.simonini.storage.domain?" +
+					"dialect=org.hibernate.dialect.PostgreSQLDialect&" +
+					"hibernate.physical_naming_strategy=" +
+					"org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy&" +
+					"hibernate.implicit_naming_strategy=" +
+					"org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy"
+		}
+	}
+	runList = project.ext.runList
+}
+
