@@ -62,9 +62,6 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
-//dockerCompose.isRequiredBy(test)
-//dockerCompose.isRequiredBy(bootRun)
-
 spotless {
 	java {
 		importOrder()
@@ -94,9 +91,34 @@ jacocoTestReport {
 diff.dependsOn compileJava
 diffChangeLog.dependsOn compileJava
 
+task migrateTestDatabase(type: Exec) {
+	println 'migrating local test database'
+	commandLine './gradlew',  'update', '-PrunList=test'
+}
+
+dockerCompose.isRequiredBy(test)
+test {
+	doFirst {
+		migrateTestDatabase
+	}
+}
+//dockerCompose.isRequiredBy(bootRun)
+
 liquibase {
 	activities {
+		doFirst {
+			if (!project.hasProperty('runList')) {
+				project.ext.runList = "diffMain"
+			}
+		}
 		main {
+			changeLogFile "src/main/resources/db/changelog/db.changelog-master.xml"
+			url "jdbc:postgresql://localhost:5432/storage-experiments"
+			username "postgres"
+			password "postgres"
+			driver "org.postgresql.Driver"
+		}
+		test {
 			changeLogFile "src/main/resources/db/changelog/db.changelog-master.xml"
 			url "jdbc:postgresql://localhost:5432/storage-experiments"
 			username "postgres"
@@ -119,4 +141,3 @@ liquibase {
 	}
 	runList = project.ext.runList
 }
-
