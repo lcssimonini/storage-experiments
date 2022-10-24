@@ -7,11 +7,11 @@ banner:
 	     --data-urlencode "font=soft" \
 	     "https://devops.datenkollektiv.de/renderBannerTxt" >> src/main/resources/banner.txt
 
-build project:
+build-project:
 	@echo "\033[92m 🛠  Storage Experiments \033[0m"
 	./gradlew clean build
 
-start:
+start-app:
 	@echo "\033[92m 🛠  Starting Storage Experiments \033[0m"
 	./gradlew clean bootRun
 
@@ -24,4 +24,9 @@ compose-up:
 	docker-compose up
 
 migration:
+	@echo "Generating database migration"
 	export CHANGELOG_FILE_NAME=${DATE_WITH_TIME}-${MIGRATION_LABEL}.sql && ./gradlew diffChangeLog -PrunList=diffMain
+
+migrate-database:
+	@echo "Migrating database"
+	./gradlew update -PrunList=main
